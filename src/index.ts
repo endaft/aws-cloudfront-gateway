@@ -21,6 +21,15 @@ function encodeBody(data: S3.GetObjectOutput): EncodedBody {
   };
 }
 
+function log(message: string, context: any) {
+  console.log(
+    JSON.stringify({
+      message,
+      context,
+    })
+  );
+}
+
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
   try {
     const { config, request } = event.Records[0].cf;
@@ -39,6 +48,17 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
     const s3Path = path.join(s3.path.substring(1), subDomain, request.uri);
     const client = new S3({ region: bucketRegion });
+
+    log('Handling static content request', {
+      bucketRegion,
+      bucketName,
+      subDomain,
+      s3Path,
+      targetHost,
+      baseHost,
+      hostDiff,
+    });
+
     const s3Data = await client.getObject({ Bucket: bucketName, Key: s3Path }).promise();
     const { body, bodyEncoding } = encodeBody(s3Data);
     return {
@@ -53,6 +73,10 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       bodyEncoding,
     };
   } catch (e) {
+    log('Error encountered', {
+      error: [...((e.stack as string) ?? e.toString()).split('\n')],
+      event,
+    });
     return {
       status: '500',
       statusDescription: 'Server Error',
