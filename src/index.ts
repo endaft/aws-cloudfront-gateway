@@ -2,6 +2,25 @@ import path from 'path';
 import { S3 } from 'aws-sdk';
 import { CloudFrontRequestEvent, CloudFrontRequestResult } from 'aws-lambda';
 
+const TextTypes = {
+  MimeStart: ['text'],
+  MimeEnd: ['json', 'xml', 'html', 'css', 'csv'],
+};
+
+type EncodedBody = { body: string; bodyEncoding: 'text' | 'base64' };
+
+function encodeBody(data: S3.GetObjectOutput): EncodedBody {
+  const contentType = data.ContentType ?? 'application/octet-stream';
+  const mimeParts = contentType.toLowerCase().split('/');
+  const prefix = mimeParts.shift();
+  const suffix = mimeParts.pop();
+  const isText = TextTypes.MimeStart.includes(prefix) || TextTypes.MimeEnd.includes(suffix);
+  return {
+    body: data.Body.toString(isText ? 'utf-8' : 'base64'),
+    bodyEncoding: isText ? 'text' : 'base64',
+  };
+}
+
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
   try {
     const { config, request } = event.Records[0].cf;
@@ -21,6 +40,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const s3Path = path.join(s3.path.substring(1), subDomain, request.uri);
     const client = new S3({ region: bucketRegion });
     const s3Data = await client.getObject({ Bucket: bucketName, Key: s3Path }).promise();
+    const { body, bodyEncoding } = encodeBody(s3Data);
     return {
       status: '200',
       statusDescription: 'OK',
@@ -29,7 +49,8 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
         'content-type': [{ value: s3Data.ContentType }],
         'last-modified': [{ value: s3Data.LastModified.toUTCString() }],
       },
-      body: s3Data.Body.toString(),
+      body,
+      bodyEncoding,
     };
   } catch (e) {
     return {
