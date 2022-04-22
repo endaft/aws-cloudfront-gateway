@@ -28,6 +28,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const s3Path = path.join(s3.path, subDomain);
 
     request.origin.s3.path = s3Path;
+    Reflect.deleteProperty(request.origin.s3.customHeaders, 'x-base-host');
     log('Redirecting request to origin path', { s3Path, request });
 
     return request;
