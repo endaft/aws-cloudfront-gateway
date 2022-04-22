@@ -25,7 +25,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const baseHost = s3.customHeaders['x-base-host'][0].value;
     const hostDiff = targetHost.length - baseHost.length;
     const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
-    const s3Path = path.join(s3.path.substring(1), subDomain, request.uri);
+    const s3Path = path.join(s3.path, subDomain, request.uri);
 
     request.origin.s3.path = s3Path;
     log('Redirecting request to origin path', { s3Path, request });
