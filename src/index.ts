@@ -29,7 +29,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
 
     request.origin.s3.path = s3Path;
     request.headers['host'][0].value = request.origin.s3.domainName;
-    request.headers['x-target-domain'].push({ value: targetHost });
+    request.headers['x-target-domain'] = [{ value: targetHost }];
     log('Redirecting request to origin path', { s3Path, request });
 
     return request;
