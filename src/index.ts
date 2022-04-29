@@ -1,4 +1,5 @@
 import path from 'path';
+import { urlToHttpOptions } from 'url';
 import { CloudFrontRequestEvent, CloudFrontRequestResult } from 'aws-lambda';
 
 function log(message: string, context: any) {
@@ -27,12 +28,30 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
     const s3Path = path.join(s3.path, subDomain);
 
-    log('Redirecting request to origin path', { s3Path, request });
+    const customHost = request.headers[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ?? null;
+    if (!!customHost) {
+      log('Redirecting request to custom origin', { s3Path, request });
+      const opts = urlToHttpOptions(new URL(customHost));
+      Reflect.deleteProperty(request.origin, 's3');
+      request.origin.custom = {
+        path: opts.path,
+        readTimeout: 30,
+        keepaliveTimeout: 5,
+        domainName: opts.hostname,
+        customHeaders: s3.customHeaders,
+        port: parseInt(opts.port.toString() ?? '443'),
+        sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
+        protocol: opts.protocol == 'https' ? opts.protocol : 'https',
+      };
+      request.headers['host'][0].value = opts.hostname;
+    } else {
+      log('Redirecting request to S3 origin path', { s3Path, request });
 
-    request.origin.s3.path = s3Path;
-    request.headers['host'][0].value = request.origin.s3.domainName;
+      request.origin.s3.path = s3Path;
+      request.headers['host'][0].value = request.origin.s3.domainName;
+    }
+
     request.headers['x-target-domain'] = [{ value: targetHost }];
-
     return request;
   } catch (e) {
     log('Error encountered', {
