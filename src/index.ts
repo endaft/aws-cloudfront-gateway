@@ -14,7 +14,6 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
 
   try {
     const { config, request } = event.Records[0].cf;
-    log(`Handling request origin-request.`, { request, config });
     if (config.eventType.toLowerCase() !== 'origin-request') {
       return { status: '500', statusDescription: 'Invalid event type.' };
     }
@@ -53,6 +52,8 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     }
 
     request.headers['x-target-domain'] = [{ value: targetHost }];
+    log('Responding with modified request', { request });
+
     return request;
   } catch (e) {
     log('Error encountered', {
