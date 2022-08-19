@@ -2,18 +2,19 @@ import path from 'path';
 import { urlToHttpOptions } from 'url';
 import { CloudFrontRequestEvent, CloudFrontRequestResult } from 'aws-lambda';
 
-function log(message: string, context: any) {
-  console.log(
-    JSON.stringify({
-      message,
-      context,
-    })
-  );
-}
-
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
+  const log = (message: string, context: any) => {
+    console.info(
+      JSON.stringify({
+        message,
+        context,
+      })
+    );
+  };
+
   try {
     const { config, request } = event.Records[0].cf;
+    log(`Handling request origin-request.`, { request, config });
     if (config.eventType.toLowerCase() !== 'origin-request') {
       return { status: '500', statusDescription: 'Invalid event type.' };
     }
