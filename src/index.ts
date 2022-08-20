@@ -28,21 +28,26 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
     const s3Path = path.join(s3.path, subDomain).replace(/\/$/i, '');
 
-    const customHost = request.headers[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ?? null;
+    const customHost =
+      s3.customHeaders[`x-origin-${subDomain.toLowerCase()}`]?.[0]?.value ??
+      s3.customHeaders[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ??
+      null;
     if (!!customHost) {
-      log('Redirecting request to custom origin', { s3Path, request });
       const opts = urlToHttpOptions(new URL(customHost));
+      log('Redirecting request to custom origin', { s3Path, request, opts });
       Reflect.deleteProperty(request.origin, 's3');
+      const uri = opts.path.split('/').pop();
       request.origin.custom = {
-        path: opts.path,
+        path: opts.path.split('/').reverse().splice(1).reverse().join('/'),
         readTimeout: 30,
         keepaliveTimeout: 5,
         domainName: opts.hostname,
         customHeaders: s3.customHeaders,
-        port: parseInt(opts.port.toString() ?? '443'),
+        port: parseInt(`${opts.port ?? '443'}`),
         sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
-        protocol: opts.protocol == 'https' ? opts.protocol : 'https',
+        protocol: 'https',
       };
+      request.uri = `/${uri}`;
       request.headers['host'][0].value = opts.hostname;
     } else {
       log('Redirecting request to S3 origin path', { s3Path, request });
