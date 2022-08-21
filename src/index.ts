@@ -3,23 +3,25 @@ import { urlToHttpOptions } from 'url';
 import { CloudFrontRequestEvent, CloudFrontRequestResult } from 'aws-lambda';
 
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
-  const log = (message: string, context: any) => {
+  const log = <T>(message: string, context?: T) => {
     console.info(
       JSON.stringify({
         message,
         context,
       })
     );
+    return context;
   };
 
   try {
+    log('Handling Origin Request Event', event);
     const { config, request } = event.Records[0].cf;
     if (config.eventType.toLowerCase() !== 'origin-request') {
-      return { status: '500', statusDescription: 'Invalid event type.' };
+      return log('Invalid Event Type', { status: '500', statusDescription: 'Invalid Event Type' });
     }
     const { s3 } = request.origin;
     if (!s3) {
-      return { status: '500', statusDescription: 'Invalid origin type.' };
+      return log('Invalid Origin Type', { status: '500', statusDescription: 'Invalid Origin Type' });
     }
 
     const targetHost = request.headers['host'][0].value;
@@ -34,7 +36,7 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       null;
     if (!!customHost) {
       const opts = urlToHttpOptions(new URL(customHost));
-      log('Redirecting request to custom origin', { s3Path, request, opts });
+      log('Redirecting Request to Custom Origin');
       Reflect.deleteProperty(request.origin, 's3');
       const uri = opts.path.split('/').pop();
       request.origin.custom = {
@@ -50,28 +52,23 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       request.uri = `/${uri}`;
       request.headers['host'][0].value = opts.hostname;
     } else {
-      log('Redirecting request to S3 origin path', { s3Path, request });
+      log('Redirecting Request to S3 Origin Path');
 
       request.origin.s3.path = s3Path;
       request.headers['host'][0].value = request.origin.s3.domainName;
     }
 
     request.headers['x-target-domain'] = [{ value: targetHost }];
-    log('Responding with modified request', { request });
-
-    return request;
+    return log('Responding with Modified Request', request);
   } catch (e) {
-    log('Error encountered', {
+    const errorData = log('Fatal Error Encountered', {
       error: [...((e.stack as string) ?? e.toString()).split('\n')],
       event,
     });
     return {
       status: '500',
       statusDescription: 'Server Error',
-      body: JSON.stringify({
-        error: [...((e.stack as string) ?? e.toString()).split('\n')],
-        event,
-      }),
+      body: JSON.stringify(errorData),
     };
   }
 }
