@@ -19,21 +19,24 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     if (config.eventType.toLowerCase() !== 'origin-request') {
       return log('Invalid Event Type', { status: '500', statusDescription: 'Invalid Event Type' });
     }
+
     const { s3, custom } = request.origin;
     if (!s3 && !custom) {
       return log('Invalid Origin Type', { status: '500', statusDescription: 'Invalid Origin Type' });
     }
 
     const targetHost = request.headers['host'][0].value;
-    const baseHost = s3.customHeaders['x-base-host'][0].value;
-    const hostDiff = targetHost.length - baseHost.length;
-    const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
-    const s3Path = path.join(s3.path, subDomain).replace(/\/$/i, '');
-
     if (!!s3) {
+      const baseHost = s3.customHeaders['x-base-host'][0].value;
+      const hostDiff = targetHost.length - baseHost.length;
+      const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
+      const s3Path = path.join(s3.path, subDomain).replace(/\/$/i, '');
+
       log('Updating the S3 Origin Path');
       request.origin.s3.path = s3Path;
       request.headers['host'][0].value = request.origin.s3.domainName;
+    } else {
+      log('Not Modifying A Custom Origin Request');
     }
 
     request.headers['x-target-domain'] = [{ value: targetHost }];
