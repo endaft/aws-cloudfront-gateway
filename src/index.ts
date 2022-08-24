@@ -36,7 +36,12 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       request.origin.s3.path = s3Path;
       request.headers['host'][0].value = request.origin.s3.domainName;
     } else {
-      log('Not Modifying A Custom Origin Request');
+      log('Updated Custom Origin Request');
+      /**
+       * ! Make this ENSURE the correct custom origin every time
+       * ! to prevent excessive origin usage and billing
+       */
+      request.headers['host'][0].value = request.origin.custom.domainName;
     }
 
     request.headers['x-target-domain'] = [{ value: targetHost }];
