@@ -44,20 +44,21 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
         origin.customHeaders[`x-origin-${subDomain.toLowerCase()}`]?.[0]?.value ??
         origin.customHeaders[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ??
         null;
-      const customHost = customEndpoint.replace(pathVarExp, '');
-      const opts = urlToHttpOptions(new URL(customHost));
-      const uri = opts.path.split('/').pop();
+      if (!!customEndpoint) {
+        const customHost = customEndpoint.replace(pathVarExp, '');
+        const opts = urlToHttpOptions(new URL(customHost));
 
-      request.origin.custom = {
-        path: opts.path.split('/').reverse().splice(1).reverse().join('/'),
-        readTimeout: 30,
-        keepaliveTimeout: 5,
-        domainName: opts.hostname,
-        customHeaders: origin.customHeaders,
-        port: parseInt(`${opts.port ?? '443'}`),
-        sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
-        protocol: 'https',
-      };
+        request.origin.custom = {
+          path: opts.path.split('/').reverse().splice(1).reverse().join('/'),
+          readTimeout: 30,
+          keepaliveTimeout: 5,
+          domainName: opts.hostname,
+          customHeaders: origin.customHeaders,
+          port: parseInt(`${opts.port ?? '443'}`),
+          sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
+          protocol: 'https',
+        };
+      }
     }
 
     return log('Responding With Request', request);
@@ -70,6 +71,9 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       status: '500',
       statusDescription: 'Server Error',
       body: JSON.stringify(errorData),
+      headers: {
+        'Content-Type': [{ value: 'application/json' }],
+      },
     };
   }
 }
