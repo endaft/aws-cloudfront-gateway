@@ -20,32 +20,46 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       return log('Invalid Event Type', { status: '500', statusDescription: 'Invalid Event Type' });
     }
 
-    const { s3, custom } = request.origin;
-    if (!s3 && !custom) {
+    const origin = request.origin.s3 ?? request.origin.custom;
+    if (!origin) {
       return log('Invalid Origin Type', { status: '500', statusDescription: 'Invalid Origin Type' });
     }
 
     const targetHost = request.headers['host'][0].value;
-    if (!!s3) {
-      const baseHost = s3.customHeaders['x-base-host'][0].value;
-      const hostDiff = targetHost.length - baseHost.length;
-      const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
-      const s3Path = path.join(s3.path, subDomain).replace(/\/$/i, '');
+    const isS3Request = Object.hasOwn(request.origin, 's3');
+    const baseHost = origin.customHeaders['x-base-host'][0].value;
+    const hostDiff = targetHost.length - baseHost.length;
+    const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
 
+    request.headers['host'][0].value = origin.domainName;
+    request.headers['x-target-domain'] = [{ value: targetHost }];
+
+    if (isS3Request) {
       log('Updating the S3 Origin Path');
-      request.origin.s3.path = s3Path;
-      request.headers['host'][0].value = request.origin.s3.domainName;
+      request.origin.s3.path = path.join(origin.path, subDomain).replace(/\/$/i, '');
     } else {
       log('Updated Custom Origin Request');
-      /**
-       * ! Make this ENSURE the correct custom origin every time
-       * ! to prevent excessive origin usage and billing
-       */
-      request.headers['host'][0].value = request.origin.custom.domainName;
+      const customHost =
+        origin.customHeaders[`x-origin-${subDomain.toLowerCase()}`]?.[0]?.value ??
+        origin.customHeaders[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ??
+        null;
+      const opts = urlToHttpOptions(new URL(customHost));
+      const uri = opts.path.split('/').pop();
+
+      request.origin.custom = {
+        path: opts.path.split('/').reverse().splice(1).reverse().join('/'),
+        readTimeout: 30,
+        keepaliveTimeout: 5,
+        domainName: opts.hostname,
+        customHeaders: origin.customHeaders,
+        port: parseInt(`${opts.port ?? '443'}`),
+        sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
+        protocol: 'https',
+      };
+      request.uri = `/${uri}`;
     }
 
-    request.headers['x-target-domain'] = [{ value: targetHost }];
-    return log('Responding with Request', request);
+    return log('Responding With Request', request);
   } catch (e) {
     const errorData = log('Fatal Error Encountered', {
       error: [...((e.stack as string) ?? e.toString()).split('\n')],
