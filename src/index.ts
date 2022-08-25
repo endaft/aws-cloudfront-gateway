@@ -39,10 +39,12 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       request.origin.s3.path = path.join(origin.path, subDomain).replace(/\/$/i, '');
     } else {
       log('Updated Custom Origin Request');
-      const customHost =
+      const pathVarExp = /(\/\{.+\})/gim;
+      const customEndpoint =
         origin.customHeaders[`x-origin-${subDomain.toLowerCase()}`]?.[0]?.value ??
         origin.customHeaders[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ??
         null;
+      const customHost = customEndpoint.replace(pathVarExp, '');
       const opts = urlToHttpOptions(new URL(customHost));
       const uri = opts.path.split('/').pop();
 
