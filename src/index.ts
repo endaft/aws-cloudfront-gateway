@@ -58,7 +58,6 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
         sslProtocols: ['TLSv1', 'TLSv1.1', 'TLSv1.2'],
         protocol: 'https',
       };
-      request.uri = `/${uri}`;
     }
 
     return log('Responding With Request', request);
