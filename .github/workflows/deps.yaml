@@ -2,7 +2,10 @@ name: Dependencies
 on: pull_request
 
 permissions:
+  issues: write
+  contents: write
   pull-requests: write
+  repository-projects: write
 
 jobs:
   dependabot:
