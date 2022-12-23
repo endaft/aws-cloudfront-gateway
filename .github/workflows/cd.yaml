@@ -4,8 +4,15 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - ".dist/**"
+    paths:
+      - ".github/workflows/**"
+      - "jest.config.js"
+      - "package.json"
+      - "src/**"
+      - "tests/**"
+      - "tsconfig.json"
+      - "webpack.config.ts"
+      - "yarn.lock"
 
 permissions:
   issues: write
