@@ -8,7 +8,7 @@
   "license": "BSD-3",
   "private": true,
   "scripts": {
-    "test": "jest --coverage",
+    "test": "jest",
     "build": "rm -rf dist; mkdir -p dist; webpack; zip -j dist/lambda-gateway.zip dist/*; rm dist/index.js"
   },
   "dependencies": {
