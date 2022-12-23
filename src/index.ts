@@ -2,9 +2,11 @@ import path from 'path';
 import { urlToHttpOptions } from 'url';
 import { CloudFrontRequestEvent, CloudFrontRequestResult } from 'aws-lambda';
 
+export type LogLevel = keyof Console & ('debug' | 'info' | 'warn' | 'error' | 'log');
+
 export async function handler(event: CloudFrontRequestEvent): Promise<CloudFrontRequestResult> {
-  const log = <T>(message: string, context?: T) => {
-    console.info(
+  const log = <T>(message: string, context?: T, level: LogLevel = 'info') => {
+    console[level](
       JSON.stringify({
         message,
         context,
@@ -17,16 +19,16 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
     log('Received Origin Request Event', event);
     const { config, request } = event.Records[0].cf;
     if (config.eventType.toLowerCase() !== 'origin-request') {
-      return log('Invalid Event Type', { status: '500', statusDescription: 'Invalid Event Type' });
+      return log('Invalid Event Type', { status: '500', statusDescription: 'Invalid Event Type' }, 'error');
     }
 
+    const isS3Request = Object.hasOwn(request.origin, 's3');
     const origin = request.origin.s3 ?? request.origin.custom;
     if (!origin) {
-      return log('Invalid Origin Type', { status: '500', statusDescription: 'Invalid Origin Type' });
+      return log('Invalid Origin Type', { status: '500', statusDescription: 'Invalid Origin Type' }, 'error');
     }
 
     const targetHost = request.headers['host'][0].value;
-    const isS3Request = Object.hasOwn(request.origin, 's3');
     const baseHost = origin.customHeaders['x-base-host'][0].value;
     const hostDiff = targetHost.length - baseHost.length;
     const subDomain = hostDiff > 0 ? targetHost.substring(0, hostDiff - 1) : 'www';
@@ -38,12 +40,13 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
       log('Updating the S3 Origin Path');
       request.origin.s3.path = path.join(origin.path, subDomain).replace(/\/$/i, '');
     } else {
-      log('Updated Custom Origin Request');
+      log('Updating Custom Origin Request');
       const pathVarExp = /(\/\{.+\})/gim;
-      const customEndpoint =
-        origin.customHeaders[`x-origin-${subDomain.toLowerCase()}`]?.[0]?.value ??
-        origin.customHeaders[`X-Origin-${subDomain.toUpperCase()}`]?.[0]?.value ??
-        null;
+      const headerSearch = `x-origin-${subDomain.toLowerCase()}`;
+      const headerKey = Object.keys(origin.customHeaders)
+        .filter((k) => headerSearch === k.toLowerCase())
+        .pop();
+      const customEndpoint = origin.customHeaders[headerKey]?.[0]?.value;
       if (!!customEndpoint) {
         const customHost = customEndpoint.replace(pathVarExp, '');
         const opts = urlToHttpOptions(new URL(customHost));
@@ -63,10 +66,14 @@ export async function handler(event: CloudFrontRequestEvent): Promise<CloudFront
 
     return log('Responding With Request', request);
   } catch (e) {
-    const errorData = log('Fatal Error Encountered', {
-      error: [...((e.stack as string) ?? e.toString()).split('\n')],
-      event,
-    });
+    const errorData = log(
+      'Fatal Error Encountered',
+      {
+        error: [...((e.stack as string) ?? e.toString()).split('\n')],
+        event,
+      },
+      'error'
+    );
     return {
       status: '500',
       statusDescription: 'Server Error',
