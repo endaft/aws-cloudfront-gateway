@@ -14,7 +14,8 @@ permissions:
   repository-projects: write
 
 jobs:
-  dependabot:
+  continuous-deployment:
+    name: Deployment
     runs-on: ubuntu-latest
 
     steps:

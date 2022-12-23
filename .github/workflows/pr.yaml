@@ -8,7 +8,8 @@ permissions:
   repository-projects: write
 
 jobs:
-  dependabot:
+  check-pr:
+    name: Check PR
     runs-on: ubuntu-latest
 
     steps:
