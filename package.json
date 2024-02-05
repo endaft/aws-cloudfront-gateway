@@ -15,7 +15,7 @@
     "aws-sdk": "^2.1545.0"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.132",
+    "@types/aws-lambda": "^8.10.133",
     "@types/jest": "^29.5.11",
     "@types/node": "^20.11.10",
     "fork-ts-checker-webpack-plugin": "^9.0.2",
